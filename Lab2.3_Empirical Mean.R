@@ -130,6 +130,151 @@ print(gTmaxav)
 # Empirical Covariances
 #======================#
 
+# before obtaining the empirical covariances
+# important all trends are removed not just intercept
+
+# one simply way: 
+  # 1st fit a linear model (has spatial and/or temporal covariates) to the data
+  # then plot the empirical covariances of the detrended data (i.e. residuals)
+
+
+# linear model fitting use lm function,
+# the residuals from lm can be incorporated into the original df Tmax
+
+# as from time series plot, observe quadratic tendency of temp
+# over the chosen time span
+
+lm1 <- lm(z ~ lat + t + I(t ^ 2), data = Tmax)
+# I() enables the power sing ^ to be an arithmetic operator
+
+Tmax$residual <- residuals(lm1)
+
+
+#-------------------------------------------#
+# consider the spatial locations of statioins
+#-------------------------------------------#
+
+spat_df <- filter(Tmax, t == 1) %>%
+  dplyr::select(lon, lat) %>%
+  arrange(lon, lat) # ascending by lon/lat
+
+#----------
+head(Tmax, 2)
+t <- Tmax$t == 1
+length(t[t != TRUE]) # 20173
+20306-20173 # [1] 133
+#----------
+
+head(sp_av, 2)
+
+m <- nrow(sp_av) # number of stations
+
+
+#============================#
+# Empirical covariance matrix
+#============================#
+
+# use cov in R
+
+# when few missing data, use = "complete.obs"
+
+# when lots of missing data, need imputation or only a subset of stations
+
+# to compute the empirical covaraince matrices, 
+# 1st need to put the data into space-wide format using spread
+
+X <- dplyr::select(Tmax, lon, lat, residual, t) %>%
+  spread(key = t, value = residual) %>%
+  dplyr::select(-lon, -lat) %>%
+  t() # each row is t, each col is spatial residuals
+
+#---------
+s <- dplyr::select(Tmax, lon, lat, residual, t)
+head(s, 2)
+sprd <- spread(s, key = t, value = residual )
+head(sprd, 2)
+#---------
+
+
+#-----------------#
+# lag-0 covariance
+#-----------------#
+
+Lag0_cov <- cov(X, use = "complete.obs")
+
+
+#-----------------#
+# lag-1 covariance
+#-----------------#
+
+# lat-1 cov is the cov between the residuals from X[-1, ]
+# and X[-nrow(X), ]
+
+lag1_cov <- cov(X[-1, ], X[-nrow(X), ], use = "complete.obs")
+
+
+#----------------------#
+# make sense of the cov
+#----------------------#
+
+# two dim space do not have any specific ordering
+# order the station by long and then plot the permuted sp cov matrix
+
+# works best when domain of interest is rectangular with long span much larger than lat
+
+# here, a square domain, so to split the domain into lat strip
+# then plot the spatial cov matrix associated with each strip
+
+# here split the long into 4 strips
+head(spat_df, 2)
+spat_df$n <- 1:nrow(spat_df) # assign an index to each station
+lim_lon <- range(spat_df$lon)
+lon_strips <- seq(lim_lon[1], lim_lon[2], length.out = 5) # 4 long strips
+spat_df$lon_strip <- cut(spat_df$lon, lon_strips, labels = FALSE, include.lowest = TRUE)
+
+head(spat_df)
+tail(spat_df)
+
+
+# now we know in which strip each station falls
+# we subset the station data frame by strip then 
+# sore the subsetted df by latitude
+
+View(plot_cov_strips)
+
+image.plot()
+
+plot_cov_strips(Lag0_cov, spat_df = spat_df)
+# the empirical spatial covariance matrices reveal the presence 
+# of spatial correlation in the residuals
+
+# but 4 lag-0 plots seems to be qualitatively similar
+# indicates no stronge depence on longitude
+
+# but there's a dependence on latitude
+# spatial covariance decreases with decreasing latitude
+# so the covariance change as latitude changes
+# such dependence is a type of spatial non-stationary
+# such plots can be used to assess non-stationary 
+# and the requireness of sp-temp models
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
