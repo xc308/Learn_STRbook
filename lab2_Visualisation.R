@@ -152,6 +152,93 @@ print(TmaxTS)
 
 
 
+#================#
+# Hovmoller Plots
+#================#
+
+# a two-dim space time visualization, 
+# where space is collapsed (projected or averaged)
+# onto one dim; the 2nd dim is time
+
+# the Hovmoller plot can be generated easily
+# if the data are on space-time grid
+
+# Consider a latitudinal H- plot
+# 1st, generate a regular grid of 25 spatial points
+# and 100 temporal points using expand.grid function
+# with limit set to both the latitude and t limit
+
+lim_lat <- range(Tmax$lat)
+lim_t <- Tmax$t
+
+lat_axis <- seq(lim_lat[1], lim_lat[2], length.out = 25)
+t_axis <- seq(lim_t[1], lim_t[2], length.out = 100)
+
+lat_t_grid <- expand.grid(lat_axis, t_axis)
+
+
+# Next, associate each station's latitudal coords with the closest one on the grid
+# by finding the distance from the station's latitudinal coords to each point of the grid
+# finding which gridpoint is the closest, allocation that to it
+
+# store the grided data in Tmax_grids
+
+Tmax_grid <- Tmax
+o <- outer(Tmax$lat, lat_axis, "-") 
+# distance from the station's latitudinal coords to each point of grid
+# 0 : 20306 by 25
+
+dists <- abs(outer(Tmax$lat, lat_axis, "-"))
+dim(dists) # [1] 20306    25
+
+# find the closest grid point for each of the station
+m <- apply(dists, 1, which.min) # a vector 20306
+all(head(m, 153) == 14) # [1] TRUE
+# mean the first 153 stations are all closest to the 14th grid
+tail(m)
+range(m) # [1]  1 25
+
+min_g <- lat_axis[apply(dists, 1, which.min)]
+lat_axis[14] # [1] 39.57222
+
+Tmax_grid$lat <- lat_axis[apply(dists, 1, which.min)]
+# the latitude of the grid point closest to each station 
+
+# now have associated each station with closest grid point
+# left is to group by latitude and time
+
+Tmax_lat_Hov <- group_by(Tmax_grid, lat, t) %>% summarise(z = mean(z))
+# group by lat, t, 
+# summarize group by lat, average over time within each lat group
+
+# Note, in this case, every lat-t band consists at least one data point
+# so the H plot contains no missing points on the established grid
+
+# if this is not the case, interp from akima package can be used to fill out the
+# grid cell with no data
+
+
+#------#
+# plot 
+#------#
+
+Hovmoller_lat <- ggplot(Tmax_lat_Hov) +     # take the data
+  geom_tile(aes(x = lat, y = t, fill = z)) +  # plot
+  fill_scale(name = "deg F") +        # add the legend and it's title
+  scale_y_reverse() +        # reverse time scale
+  ylab("Days")      +
+  xlab("Lattitude (degrees)")  + 
+  theme_bw()
+
+
+print(Hovmoller_lat)
+
+
+
+
+
+
+
 
 
 
