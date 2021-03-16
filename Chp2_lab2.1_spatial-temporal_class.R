@@ -156,6 +156,8 @@ STObj3 <- STFDF(sp = spat_part,
 class(STObj3)
 # [1] "STFDF"
 
+data("STObj3", package = "STRbook")
+str(STObj3)
 
 #---------#
 # Add CRS

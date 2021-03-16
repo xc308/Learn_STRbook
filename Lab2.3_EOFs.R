@@ -78,7 +78,8 @@ dim(Z) # [1]  396 2261
 # Detrend and re-scale
 #=====================#
 
-spat_mean <- apply(SSTdata, 1, mean) # at each location, summing over time
+spat_mean <- apply(SSTdata, 1, mean) 
+# at each location, summing over time
 nT <- ncol(SSTdata) # [1] 396 time points
 
 Zspat_detrend <- Z - outer(rep(1, nT), spat_mean)
@@ -120,14 +121,42 @@ str(U) # num [1:396, 1:396]
 
 mutate() # add a new variable and preseves existing ones
 
-TS<- data.frame(E$u) %>%
+TS <- data.frame(E$u) %>%
   mutate(t = 1:nrow(E$u)) %>%
   gather(key = EOF, value = PC, -t)
 
+# now normalize the priciple time series
+TS$nPC <- TS$PC * sqrt(nT - 1)
+str(TS$nPC)
 
 
+#==========================================#
+# Visualize EOF & normalized PC time series
+#==========================================#
+
+# plot the 1st EOFs and corresponding PC time series
+ggplot(EOFs) +
+  geom_tile(aes(x = lon, y = lat, fill = EOF1)) + 
+  fill_scale(name = "degC") + 
+  theme_bw() + 
+  xlab("Longitude (deg)") + 
+  ylab("Latitude (deg)")
 
 
+ggplot(EOFs) +
+  geom_tile(aes(x = lon, y = lat, fill = EOF2)) + 
+  fill_scale(name = "degC") + 
+  theme_bw() + 
+  xlab("Longitude (deg)") + 
+  ylab("Latitude (deg)")
+
+
+ggplot(EOFs) +
+  geom_tile(aes(x = lon, y = lat, fill = EOF3)) + 
+  fill_scale(name = "degC") + 
+  theme_bw() + 
+  xlab("Longitude (deg)") + 
+  ylab("Latitude (deg)")
 
 
 

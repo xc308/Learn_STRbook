@@ -49,9 +49,24 @@ Tmax <- filter(NOAA_df_1990,
 
 
 Tmax$t <- Tmax$julian - 728049
+head(Tmax)
 
+#~~~~~~~~~~~~~
 length(unique(Tmax$lat)) # [1] 124
 length(Tmax$lat) #  20306
+
+head(Tmax$t)
+length(unique(Tmax$t)) # 153 julian
+
+t <- Tmax$t == 1
+length(t[t != TRUE]) # 20173
+length(t[t == TRUE]) # [1] 133 julian = 1
+
+20306-20173 # [1] 133 t == 1
+
+# order(Tmax$t)
+#~~~~~~~~~~~~~~~~~
+
 
 
 #=======================#
@@ -64,11 +79,24 @@ length(Tmax$lat) #  20306
 
 # group by long lat, then compute the average max temp at the each of the separate lon-lat coords
 
-sp_av <- group_by(Tmax, lat, lon) %>% summarise(mu_emp = mean(z))
+sp_av <- group_by(Tmax, lat, lon) %>% 
+  summarise(mu_emp = mean(z))
 # average over time for the same lat, lon group
+sp_av # 133*3
 
-g <- group_by(Tmax, lat, lon) # 20306
-# grouped by lat, lon, 31 days
+
+count(Tmax, lat, lon)
+# 133 differtn combinations of (lat,lon) groups
+# 153 time points to average over within each coords group
+
+#~~~~~~~~~~~~~~~~~~
+#g <- group_by(Tmax, lat, lon) # 20306 * 12
+# grouped by lat, lon
+
+#print(g, n = 90, width = Inf)
+#summarise(g, n = n())
+#~~~~~~~~~~~~~~~~~~~
+
 
 
 #------#
@@ -125,7 +153,7 @@ gTmaxav <- ggplot() +  # an empty framework
 print(gTmaxav)
 
 
-
+head(Tmax)
 #======================#
 # Empirical Covariances
 #======================#
@@ -151,23 +179,32 @@ Tmax$residual <- residuals(lm1)
 
 
 #-------------------------------------------#
-# consider the spatial locations of statioins
+# get the spatial locations of statioins
 #-------------------------------------------#
 
-spat_df <- filter(Tmax, t == 1) %>%
+spat_df <- filter(Tmax, t == 1) %>%  # chose 1 day snapshot, has 133 stations (different groups of (lat, lon)) 
   dplyr::select(lon, lat) %>%
   arrange(lon, lat) # ascending by lon/lat
+
+head(spat_df)
+str(spat_df) # data.frame':	133 obs. of  2 variables:
 
 #----------
 head(Tmax, 2)
 t <- Tmax$t == 1
 length(t[t != TRUE]) # 20173
 20306-20173 # [1] 133
+
+head(f, 2)
+s <- dplyr::select(f, lon, lat)
+A <- arrange(s, lon, lat)
+head(A); tail(A) # ascend by lon
 #----------
 
-head(sp_av, 2)
 
-m <- nrow(sp_av) # number of stations
+# number of stations (different groups of (lat, lon))
+
+m <- nrow(sp_av) #  133
 
 
 #============================#
@@ -188,12 +225,15 @@ X <- dplyr::select(Tmax, lon, lat, residual, t) %>%
   dplyr::select(-lon, -lat) %>%
   t() # each row is t, each col is spatial residuals
 
-#---------
+dim(X) # [1] 153 time points 133 residuals at each locations
+
+
+#~~~~~~~~~~
 s <- dplyr::select(Tmax, lon, lat, residual, t)
 head(s, 2)
 sprd <- spread(s, key = t, value = residual )
 head(sprd, 2)
-#---------
+#~~~~~~~~~~~
 
 
 #-----------------#
@@ -202,6 +242,12 @@ head(sprd, 2)
 
 Lag0_cov <- cov(X, use = "complete.obs")
 
+View(cov)
+# "all.obs", "complete.obs", "pairwise.complete.obs"
+
+dim(Lag0_cov) # 133 133
+
+range(Lag0_cov) # [1] -13.85848  75.05377
 
 #-----------------#
 # lag-1 covariance
@@ -211,7 +257,7 @@ Lag0_cov <- cov(X, use = "complete.obs")
 # and X[-nrow(X), ]
 
 lag1_cov <- cov(X[-1, ], X[-nrow(X), ], use = "complete.obs")
-
+str(lag1_cov)
 
 #----------------------#
 # make sense of the cov
@@ -230,21 +276,83 @@ head(spat_df, 2)
 spat_df$n <- 1:nrow(spat_df) # assign an index to each station
 lim_lon <- range(spat_df$lon)
 lon_strips <- seq(lim_lon[1], lim_lon[2], length.out = 5) # 4 long strips
-spat_df$lon_strip <- cut(spat_df$lon, lon_strips, labels = FALSE, include.lowest = TRUE)
+spat_df$lon_strip <- cut(spat_df$lon, lon_strips, 
+                         labels = FALSE, include.lowest = TRUE)
 
 head(spat_df)
 tail(spat_df)
 
+cut
 
 # now we know in which strip each station falls
 # we subset the station data frame by strip then 
-# sore the subsetted df by latitude
+# sort the subsetted df by latitude
 
 View(plot_cov_strips)
 
-image.plot()
+
+
+#================#
+# plot_cov_strips
+#================#
+
+#---------------------#
+# self-write function
+#---------------------#
+
+emp_cov_plt <- function(C, spat_df) {
+  require(fields)
+  
+  for (i in seq_along(unique(spat_df$lon_strip))) {
+    spat_strip <- filter(spat_df, lon_strip == i) %>% 
+      arrange(lat)
+    
+    idx <- spat_strip$n  # the station idx within this strip
+    jitter <- seq(0, 1e-4, length = length(idx))
+    
+    image.plot(x = spat_strip$lat + jitter, 
+               y = spat_strip$lat + jitter,
+               z = C[idx, idx], 
+               xlab = "Latitude", ylab = "Latitude",
+               zlim = c(-15, 85), 
+               col = tim.colors(10), cex = 200)
+  }
+}
+
+plotcov(Lag0_cov)
+
+#--------------#
+# View function
+#--------------#
+
+function (C, spat_df) 
+{
+  require(fields)
+  for (i in seq_along(unique(spat_df$lon_strip))) {
+    spat_strip <- spat_df %>% filter(lon_strip == i) %>% 
+      arrange(lat)
+    idx <- spat_strip$n
+    jitter <- seq(0, 1e-04, length = length(idx))
+    image.plot(spat_strip$lat + jitter, spat_strip$lat + 
+                 jitter, C[idx, idx], xlab = "latitude", ylab = "latitude", 
+               zlim = c(-15, 85), col = tim.colors(10), cex = 200)
+  }
+}
+
+
+
+#------#
+# plot
+#------#
 
 plot_cov_strips(Lag0_cov, spat_df = spat_df)
+
+emp_cov_plt(Lag0_cov, spat_df = spat_df)
+
+#------------#
+# Understand
+#------------#
+
 # the empirical spatial covariance matrices reveal the presence 
 # of spatial correlation in the residuals
 
@@ -260,10 +368,9 @@ plot_cov_strips(Lag0_cov, spat_df = spat_df)
 
 
 
+x_try <- seq(0, 600, length.out = 10000)
 
-
-
-
+cov
 
 
 

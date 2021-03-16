@@ -32,10 +32,10 @@ Times <- read.table(system.file("extdata", "Times_1990.dat",
 
 
 # max Temp 1461 * 328
-Tmax <- read.table(system.file("extdata", "Tmax_1990.dat", 
+Tmax_2 <- read.table(system.file("extdata", "Tmax_1990.dat", 
             package = "STRbook"))
 
-head(Tmax, 2)
+head(Tmax_2)
 names(Tmax) <- locs$id
 
 
@@ -72,7 +72,8 @@ head(names(Tmax), 10)
 # key-value pair, keys are station IDs
 # values are the MaxTemp stored in z
 
-head(Tmax, 2)
+head(Tmax, 10)
+str(Tmax)
 
 Tmax_long <- gather(Tmax, id, z, -julian, -year, -month, -day)
 
@@ -188,7 +189,6 @@ head(Tmax_wide) # the 1st column is julian
 # to construct a standard matrix containing id and z only
 M <- select(Tmax_wide, -julian) %>% as.matrix()
 dim(M) # [1] 1461  137
-
 
 
 
