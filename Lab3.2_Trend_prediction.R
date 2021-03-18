@@ -121,6 +121,94 @@ Tmax_Jul_lm %>% summary()
 
 
 
+#==================#
+# Correlated Errors
+#==================#
+
+# there is clearly correlation in the residuals
+# indicating that the fixed effects are not able to 
+# explain the sp-t varaibility in the data
+
+
+# if the sp_t covariance fun of these errors are known
+# can use generalized least sq to fit the model
+
+# if the cov function was a Gau, iso, with range of 0.5
+
+Tmax_J_gls <- gls(z ~ (lon + lat + day)^2 + ., 
+    data = select(Tmax2_no_14, -id),
+    correlation = corGaus(value = 0.5,
+                          form = ~ lon + lat + day,
+                          fixed = TRUE))
+
+
+
+#===================#
+# Stepwise Selection
+#===================#
+
+# Stepwise is used to find a parsimounious model
+# from a large seletion of explanatory varaible
+# s.t. each varialbe is included or excluded in a step
+# to minimizes the AIC of the fitted model
+
+# simplest: start from intercept model
+# each step is adding/removing one variable
+# full model: its scope
+
+# the following for loop retrieves the 
+# fitted model for each step of the stepwise AIC forward selection
+
+Tmax_J_lm4 <- list()
+Tmax_J_lm4[[i + 1]] <- for(i in 0:4) { # 4 steps after intercept model
+  step(lm(z ~ 1, data = select(Tmax2_no_14, -id)),
+       scope = z ~ (lon + lat + day) ^ 2 + .,
+       direction = "forward",
+       steps = i)
+  
+}
+
+head(Tmax2_no_14, 2)
+
+
+
+#===================#
+# Multicollinearity
+#===================#
+
+
+# fairly common in sp-t modelling to have multicollinarity
+# both in sp and t
+
+# multicollinearity will result in a high correlation
+# betw the estimators of the regression coefficients
+
+# the 13th basis function is the 5th basis function corrupted by noise
+Tmax2_no_14_2 <- Tmax2_no_14 %>% 
+  mutate(B13 = B5 + 0.01 * rnorm(nrow(Tmax2_no_14)))
+
+
+Tmax_J_lm3 <- lm(z ~ (lon + lat + day) ^ 2 + .,
+   data = Tmax2_no_14_2 %>%
+     select(-id))
+
+summary(Tmax_J_lm3)
+# both 5th and 13th basis functions are no loner
+# significant at 1% level. 
+
+# The introduction will not adversely affect 
+# the predicitons and prediction std errors.
+
+# but will resutl in a high positive or neg correlation
+# btw the estimator of the regr coefficient
+
+vcov(Tmax_J_lm3)[c("B5", "B13"), c("B5", "B13")] %>%
+  cov2cor()
+
+head(a)
+
+
+
 
 
 
