@@ -209,6 +209,249 @@ head(a)
 
 
 
+#====================#
+# Analyzing Residuals
+#====================#
+
+# Having fitted a sp-t model, good practice to check residuals
+# if they are still sp-t correlated, the our model won't have
+# captured adequatedly the sp-t variability in the data
+
+# extract the residuals from our linear model
+# using function residuals
+
+Tmax_no_14$residuals <- residuals(Tmax_Jul_lm)
+
+# plot the residuals of the last eight days
+# show these residuals are spatially correlated
+
+
+g <- ggplot(filter(Tmax_no_14, day %in% 24:31)) +
+  geom_point(aes(lon, lat, colour = residuals)) +
+  facet_wrap(~ day, ncol = 4) + 
+  col_scale(name = "degF") + 
+  geom_point(data = filter(Tmax_no_14, 
+                           day %in% 24:31 &
+                             id %in% c(3810, 3889)),
+             aes(lon, lat), colour = "black",
+             pch = 2, size = 2.5) +
+  theme_bw()
+
+print(g)
+
+
+#---------------#
+# Moran's I test
+#---------------#
+
+# to test for spatial dependence in the residual on each day
+# take each day, compute the distances to form the weight matrix
+# carry out Moran's I test 
+
+P <- list()
+days <- c(1:13, 15:31)
+for (i in seq_along(days)) {
+  Tmax_day <- filter(Tmax_no_14,
+         day == days[i]) 
+  
+  station.dist <- Tmax_day %>% 
+    select(lon, lat) %>%
+    dist() %>% 
+    as.matrix()
+  
+  station.dist.inv <- 1 / station.dist
+  
+  diag(station.dist.inv) <- 0
+  
+  P[[i]] <- Moran.I(Tmax_day$residuals, 
+          station.dist.inv) %>%
+    do.call("cbind", .)
+}
+
+
+str(P)
+# List of 30
+# $ : num [1, 1:4]
+
+
+# P is a list of single-row data frames
+# bind each of these row
+do.call("rbind", P) %>% head()
+
+
+#--------------------------#
+# Extending Moran'I to sp-t
+#--------------------------#
+
+# usual problem of how to scale time to make
+# a Euclidean distance across sp-t and have a 
+# realistic interpreation
+
+# one way: fit a dependence model allows for scaling in time
+# and scale time by an estimate of the scalling factor
+# prior to compute the Euclidean distance
+# which uses an anisotropic covariance fun
+
+# for now, did with IDW, don't scale time and 
+# compute dis on the sp-t domain
+
+station.dists <- Tmax_no_14 %>%
+  select(lon, lat, day) %>%
+  dist() %>%
+  as.matrix()
+
+station.dists.inv <- 1/station.dists
+diag(station.dists.inv) <- 0
+Moran.I(Tmax_no_14$residuals, station.dists.inv)$p.value
+# 0
+# very small, strongly suggest that there's sp-t dependence
+
+
+# if data are regularly spaced in time
+# one may also look at the temporal residuals
+# at some locations and test for temporal correlation
+# in these residuals using D-W test
+
+TS1 <- filter(Tmax_no_14, id == 3810)$residuals
+TS2 <- filter(Tmax_no_14, id == 3889)$residuals
+
+
+par(mfrow = c(1, 1))
+plot(TS1, 
+     xlab = "day of Jul 1993",
+     ylab = "residuals (degF)",
+     type = 'o',
+     ylim = c(-8, 7))
+
+lines(TS2, 
+      xlab = "day of Jul 1993",
+      ylab = "residuals (degF)",
+      type = "o", 
+      col = "red")
+
+# strong temporal correlation in the residuals
+# residuals close to each other in time tend to be
+# more simila than residuals further apart
+
+# also, resiuals are correlated betw stations. 
+# given a certain time point
+
+acf(TS1) # strong lag 1 correlation
+acf(TS2)
+
+
+#-----------#
+# Group data
+#-----------#
+
+nested_Tmax_no_14 <- group_by(Tmax_no_14, lon, lat) %>% nest()
+
+nest()
+
+mutate # adds new varaible and preserve exisisting one
+
+
+
+#============#
+# Prediction
+#============#
+
+#----------------#
+# prediction grid
+#----------------#
+
+pred_grid <- expand.grid(lon = seq(-100, -80, length = 20),
+            lat = seq(32, 46, length = 20),
+            day = seq(4, 29, length = 6))
+
+str(pred_grid) # 2400 obs. of  3 variables
+
+# would require all covariate values at all prediction locations
+# so the 12 basis functions need to be evaluated on this grid
+# do this by calling eval_basis and converting the result to matrix
+# then attach to our prediction grid
+
+Spred <- eval_basis(basis = G, 
+           s = pred_grid[, c("lon", "lat")] %>% # predict location
+             as.matrix()) %>%
+  as.matrix()
+
+colnames(Spred) <- paste0("B", 1:ncol(Spred))
+
+str(Spred) # num [1:2400, 1:12]
+
+# attach Spred to grid
+pred_grid <- cbind(pred_grid, Spred)
+
+
+linreg_pred <- predict(Tmax_Jul_lm,
+        newdata = pred_grid,
+        interval = "prediction")
+
+head(linreg_pred)
+# the pred interval = pred +/- 1.96 * pred std error
+
+
+#---------------------------------------#
+# Assign pred and pred s.e. to pred grid
+#---------------------------------------#
+
+pred_grid$z_pred <- linreg_pred[, 1]
+pred_grid$z_err <- (linreg_pred[, 3] - linreg_pred[, 2]) / (2 * 1.96)
+
+head(pred_grid, 2)
+
+g_pred <- ggplot(pred_grid) + 
+  geom_tile(aes(lon, lat, fill = z_pred),
+            colour = tom.color) + 
+  facet_wrap(~ day, ncol = 3) + 
+  theme_bw()
+
+print(g_pred)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
