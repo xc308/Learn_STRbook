@@ -295,7 +295,7 @@ ggplot(Y[[1]]) +
 # Simulating Observations
 #========================#
 
-# want to simulate noisy observations from process Y
+# want to simulate noisy observations using process Y model
 # Because the only way to test whether algo for inference
 # are working as they should is to mimic both
 # underlying true process and the measurement process
@@ -304,7 +304,7 @@ ggplot(Y[[1]]) +
 # reliable algorithms to be applied to real data
 
 
-# to map the observations of process to the data 
+# to map the observations of process Y to the data Z
 # need an incidence matrix that picks out the process value
 # that has been observed. 
 
@@ -330,7 +330,8 @@ for(i in 1:nobs) {
   idx <- which(sobs[i] == s_grid)
   Ht[i, idx] <- 1
 }
-
+ 
+which(sobs[1] == s_grid) # [1] 96
 
 #------------------#
 # Simulate the data
@@ -351,7 +352,7 @@ t_grid <- 0:(nT - 1)
 
 
 z_df <- data.frame()
-for(j in 0:(nT-1)) {
+for(j in 0:(nT - 1)) {
   Yt <- filter(Y[[1]], t == j)$Y
   
   zt <- Ht %*% Yt + rnorm(nobs)
@@ -359,6 +360,20 @@ for(j in 0:(nT-1)) {
   z_df <- rbind(z_df, 
         data.frame(s = sobs, t = j, z = zt))
 }
+
+
+## alternatively, faster version
+z_df_l <- list()
+for(j in 0:(nT - 1)) {
+  Yt <- filter(Y[[1]], t == j)$Y
+  
+  zt <- Ht %*% Yt + rnorm(nobs)
+  
+  z_df_l[[j + 1]] <- data.frame(s = sobs, t = j, z = zt) # j + 1 = 1
+  z_df <- rbindlist(z_df_l)
+}
+
+str(z_df)
 
 
 #--------------------------#
